@@ -1,0 +1,230 @@
+basePath: /
+definitions:
+  github_com_ricountzero_SubscriptionLedger_internal_model.CreateSubscriptionRequest:
+    properties:
+      end_date:
+        example: 12-2025
+        type: string
+      price:
+        example: 400
+        minimum: 1
+        type: integer
+      service_name:
+        example: Yandex Plus
+        type: string
+      start_date:
+        example: 07-2025
+        type: string
+      user_id:
+        example: 60601fee-2bf1-4721-ae6f-7636e79a0cba
+        type: string
+    required:
+    - price
+    - service_name
+    - start_date
+    - user_id
+    type: object
+  github_com_ricountzero_SubscriptionLedger_internal_model.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  github_com_ricountzero_SubscriptionLedger_internal_model.SubscriptionResponse:
+    properties:
+      created_at:
+        type: string
+      end_date:
+        type: string
+      id:
+        type: string
+      price:
+        type: integer
+      service_name:
+        type: string
+      start_date:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  github_com_ricountzero_SubscriptionLedger_internal_model.TotalCostResponse:
+    properties:
+      total_cost:
+        type: integer
+    type: object
+  github_com_ricountzero_SubscriptionLedger_internal_model.UpdateSubscriptionRequest:
+    properties:
+      end_date:
+        type: string
+      price:
+        type: integer
+      service_name:
+        type: string
+      start_date:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API for aggregating user online subscriptions
+  title: Subscription Ledger API
+  version: "1.0"
+paths:
+  /api/v1/subscriptions:
+    get:
+      description: List subscriptions with optional filters
+      parameters:
+      - description: Filter by user UUID
+        in: query
+        name: user_id
+        type: string
+      - description: Filter by service name
+        in: query
+        name: service_name
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_ricountzero_SubscriptionLedger_internal_model.SubscriptionResponse'
+            type: array
+      summary: List subscriptions
+      tags:
+      - subscriptions
+    post:
+      consumes:
+      - application/json
+      description: Create a new subscription record
+      parameters:
+      - description: Subscription data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_ricountzero_SubscriptionLedger_internal_model.CreateSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_ricountzero_SubscriptionLedger_internal_model.SubscriptionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_ricountzero_SubscriptionLedger_internal_model.ErrorResponse'
+      summary: Create subscription
+      tags:
+      - subscriptions
+  /api/v1/subscriptions/{id}:
+    delete:
+      description: Delete a subscription by ID
+      parameters:
+      - description: Subscription UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_ricountzero_SubscriptionLedger_internal_model.ErrorResponse'
+      summary: Delete subscription
+      tags:
+      - subscriptions
+    get:
+      description: Get a subscription by ID
+      parameters:
+      - description: Subscription UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_ricountzero_SubscriptionLedger_internal_model.SubscriptionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_ricountzero_SubscriptionLedger_internal_model.ErrorResponse'
+      summary: Get subscription
+      tags:
+      - subscriptions
+    patch:
+      consumes:
+      - application/json
+      description: Partially update a subscription
+      parameters:
+      - description: Subscription UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_ricountzero_SubscriptionLedger_internal_model.UpdateSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_ricountzero_SubscriptionLedger_internal_model.SubscriptionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_ricountzero_SubscriptionLedger_internal_model.ErrorResponse'
+      summary: Update subscription
+      tags:
+      - subscriptions
+  /api/v1/subscriptions/total-cost:
+    get:
+      description: Calculate total cost for a period
+      parameters:
+      - description: Period start MM-YYYY
+        in: query
+        name: period_from
+        required: true
+        type: string
+      - description: Period end MM-YYYY
+        in: query
+        name: period_to
+        required: true
+        type: string
+      - description: Filter by user UUID
+        in: query
+        name: user_id
+        type: string
+      - description: Filter by service name
+        in: query
+        name: service_name
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_ricountzero_SubscriptionLedger_internal_model.TotalCostResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_ricountzero_SubscriptionLedger_internal_model.ErrorResponse'
+      summary: Total subscription cost
+      tags:
+      - subscriptions
+swagger: "2.0"

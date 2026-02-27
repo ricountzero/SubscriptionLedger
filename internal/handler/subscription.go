@@ -1,0 +1,199 @@
+package handler
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/ricountzero/SubscriptionLedger/internal/model"
+	"github.com/ricountzero/SubscriptionLedger/internal/service"
+	"go.uber.org/zap"
+)
+
+type SubscriptionHandler struct {
+	svc    *service.SubscriptionService
+	logger *zap.Logger
+}
+
+func NewSubscriptionHandler(svc *service.SubscriptionService, logger *zap.Logger) *SubscriptionHandler {
+	return &SubscriptionHandler{svc: svc, logger: logger}
+}
+
+func (h *SubscriptionHandler) RegisterRoutes(r *gin.Engine) {
+	v1 := r.Group("/api/v1")
+	v1.GET("/subscriptions/total-cost", h.TotalCost)
+	subs := v1.Group("/subscriptions")
+	subs.POST("", h.Create)
+	subs.GET("", h.List)
+	subs.GET("/:id", h.GetByID)
+	subs.PATCH("/:id", h.Update)
+	subs.DELETE("/:id", h.Delete)
+}
+
+// Create godoc
+// @Summary      Create subscription
+// @Description  Create a new subscription record
+// @Tags         subscriptions
+// @Accept       json
+// @Produce      json
+// @Param        body  body      model.CreateSubscriptionRequest  true  "Subscription data"
+// @Success      201   {object}  model.SubscriptionResponse
+// @Failure      400   {object}  model.ErrorResponse
+// @Router       /api/v1/subscriptions [post]
+func (h *SubscriptionHandler) Create(c *gin.Context) {
+	var req model.CreateSubscriptionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: err.Error()})
+		return
+	}
+	sub, err := h.svc.Create(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, sub)
+}
+
+// GetByID godoc
+// @Summary      Get subscription
+// @Description  Get a subscription by ID
+// @Tags         subscriptions
+// @Produce      json
+// @Param        id   path      string  true  "Subscription UUID"
+// @Success      200  {object}  model.SubscriptionResponse
+// @Failure      404  {object}  model.ErrorResponse
+// @Router       /api/v1/subscriptions/{id} [get]
+func (h *SubscriptionHandler) GetByID(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "invalid uuid"})
+		return
+	}
+	sub, err := h.svc.GetByID(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.ErrorResponse{Error: err.Error()})
+		return
+	}
+	if sub == nil {
+		c.JSON(http.StatusNotFound, model.ErrorResponse{Error: "subscription not found"})
+		return
+	}
+	c.JSON(http.StatusOK, sub)
+}
+
+// List godoc
+// @Summary      List subscriptions
+// @Description  List subscriptions with optional filters
+// @Tags         subscriptions
+// @Produce      json
+// @Param        user_id       query     string  false  "Filter by user UUID"
+// @Param        service_name  query     string  false  "Filter by service name"
+// @Success      200           {array}   model.SubscriptionResponse
+// @Router       /api/v1/subscriptions [get]
+func (h *SubscriptionHandler) List(c *gin.Context) {
+	var userID *uuid.UUID
+	if s := c.Query("user_id"); s != "" {
+		id, err := uuid.Parse(s)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "invalid user_id"})
+			return
+		}
+		userID = &id
+	}
+	var serviceName *string
+	if s := c.Query("service_name"); s != "" {
+		serviceName = &s
+	}
+	subs, err := h.svc.List(c.Request.Context(), userID, serviceName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.ErrorResponse{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, subs)
+}
+
+// Update godoc
+// @Summary      Update subscription
+// @Description  Partially update a subscription
+// @Tags         subscriptions
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string                           true  "Subscription UUID"
+// @Param        body  body      model.UpdateSubscriptionRequest  true  "Fields to update"
+// @Success      200   {object}  model.SubscriptionResponse
+// @Failure      404   {object}  model.ErrorResponse
+// @Router       /api/v1/subscriptions/{id} [patch]
+func (h *SubscriptionHandler) Update(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "invalid uuid"})
+		return
+	}
+	var req model.UpdateSubscriptionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: err.Error()})
+		return
+	}
+	sub, err := h.svc.Update(c.Request.Context(), id, &req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: err.Error()})
+		return
+	}
+	if sub == nil {
+		c.JSON(http.StatusNotFound, model.ErrorResponse{Error: "subscription not found"})
+		return
+	}
+	c.JSON(http.StatusOK, sub)
+}
+
+// Delete godoc
+// @Summary      Delete subscription
+// @Description  Delete a subscription by ID
+// @Tags         subscriptions
+// @Param        id   path   string  true  "Subscription UUID"
+// @Success      204
+// @Failure      404  {object}  model.ErrorResponse
+// @Router       /api/v1/subscriptions/{id} [delete]
+func (h *SubscriptionHandler) Delete(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: "invalid uuid"})
+		return
+	}
+	found, err := h.svc.Delete(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.ErrorResponse{Error: err.Error()})
+		return
+	}
+	if !found {
+		c.JSON(http.StatusNotFound, model.ErrorResponse{Error: "subscription not found"})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// TotalCost godoc
+// @Summary      Total subscription cost
+// @Description  Calculate total cost for a period
+// @Tags         subscriptions
+// @Produce      json
+// @Param        period_from   query     string  true   "Period start MM-YYYY"
+// @Param        period_to     query     string  true   "Period end MM-YYYY"
+// @Param        user_id       query     string  false  "Filter by user UUID"
+// @Param        service_name  query     string  false  "Filter by service name"
+// @Success      200           {object}  model.TotalCostResponse
+// @Failure      400           {object}  model.ErrorResponse
+// @Router       /api/v1/subscriptions/total-cost [get]
+func (h *SubscriptionHandler) TotalCost(c *gin.Context) {
+	var req model.TotalCostRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: err.Error()})
+		return
+	}
+	result, err := h.svc.TotalCost(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
